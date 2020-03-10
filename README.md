@@ -1,2 +1,4 @@
-# rust-text-rpg
-Text roleplaying game made in Rust. Study project.
+# Rust text RPG
+Learning project in 100% columbian Rust. 
+
+
