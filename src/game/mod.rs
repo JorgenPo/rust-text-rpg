@@ -1,7 +1,18 @@
 use std::error::Error;
 use std::fmt::Debug;
 
+use crate::render;
+
+use std::time::Duration;
+use std::io::Write;
+use termion::raw::IntoRawMode;
+use termion::screen;
+
 mod menu;
+mod exit_splash;
+mod start_splash;
+mod input;
+mod sound;
 
 /// Here is a state system implemented
 /// Inspired by Veloren project
@@ -15,39 +26,71 @@ enum PlayResult {
     /// Push a new state to the stack
     Push(Box<dyn PlayState>),
     /// Replace the current state with another
-    Switch(Box<dyn PlayState>)
+    Switch(Box<dyn PlayState>),
+    /// Do nothing
+    Still,
 }
 
 /// Represents some game state (e.g. menu, battle and so on)
 trait PlayState {
     fn play(&mut self, game_state: &mut GlobalState) -> PlayResult;
     fn to_string(&self) -> String;
+    fn is_waiting_for_input(&self) -> bool;
 }
 
 pub struct GlobalState {
+    render: render::Render,
+    input: input::Controller,
+    sound: sound::Manager,
 }
 
 pub struct Game {
-    states: Vec<Box<dyn PlayState>>
+    states: Vec<Box<dyn PlayState>>,
+    fps: u16,
+    mpf: u16
 }
 
 impl Game {
     pub fn new() -> Self {
-        let states : Vec<Box<dyn PlayState>> = vec![Box::new(menu::PlayState{})];
-        Game { states }
+        let states : Vec<Box<dyn PlayState>> = vec![];
+        let fps = 10;
+        let mpf = 1000 / fps;
+
+        Game { states, fps, mpf }
     }
 
     /// Starts the game
-    pub fn run(&mut self) -> Result<(), Box<dyn Error>> {
-        let mut global_state = GlobalState{};
+    pub fn run(&mut self) -> Result<(), String> {
+        let mut stdout = std::io::stdout().into_raw_mode();
 
-        while let Some(result) = self.states.last_mut()
-            .map(|state| state.play(&mut global_state)) {
+        if stdout.is_err() {
+            return Err(format!("Failed to set terminal into raw mode"));
+        }
 
-            match result {
+        let mut stdout = screen::AlternateScreen::from(stdout.unwrap());
+
+        let mut global_state = GlobalState{
+            render: render::Render::new(),
+            input: input::Controller::new(),
+            sound: sound::Manager::new(),
+        };
+
+        self.states.push(Box::new(start_splash::PlayState::new()));
+
+        let mut playing = true;
+        while playing {
+            let mut current_state = match self.states.last_mut() {
+                None => {
+                    playing = false;
+                    continue;
+                },
+                Some(state) => state
+            };
+
+            let waiting_for_input = current_state.is_waiting_for_input();
+            match current_state.play(&mut global_state) {
                 PlayResult::Shutdown => {
-                    println!("Shutdown");
-                    return Ok(());
+                    playing = false;
                 },
                 PlayResult::Pop => {
                     let state = self.states.pop().expect("Empty state in queue!");
@@ -58,13 +101,25 @@ impl Game {
                     self.states.push(state);
                 },
                 PlayResult::Switch(state) => {
-                    let old_state = self.states.pop().expect("Empty state in queue!");
-                    println!("Switch to state: {} from {}", state.to_string(), old_state.to_string());
+                    self.states.pop().expect("Empty state in queue!");
                     self.states.push(state);
+                    continue;
                 },
+                PlayResult::Still => {}
+            }
+
+            stdout.flush().unwrap();
+
+            if playing && waiting_for_input {
+                // Update inputs
+                global_state.input.update();
+
+                // Wait some time to fixate FPS
+                // std::thread::sleep(Duration::from_millis(self.mpf as u64));
             }
         }
 
+        println!("Shutdown the game");
         Ok(())
     }
 }
