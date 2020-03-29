@@ -6,19 +6,28 @@ use termion::color;
 use termion::event::Key;
 use std::time::Duration;
 
-/// Menu game state implementation
+use super::map;
+use super::exit_splash;
+
+/// Menu GAME state implementation
 
 pub struct PlayState {
     buttons: [Label; 3],
     selected_index: i8,
-    should_terminate: bool,
     bg_music_started: bool
 }
+
+const BUTTON_NEW_GAME: u8 = 0;
+const BUTTON_SETTINGS: u8 = 1;
+const BUTTON_EXIT: u8 = 2;
+
+const BUTTON_SOUND_EXIT: &'static str = "assets/sound/button2.wav";
+const BUTTON_SOUND: &'static str = "assets/sound/button.wav";
 
 impl PlayState {
     pub fn new(state: &GlobalState) -> Self {
 
-        let new_game = Label::new("New game");
+        let new_game = Label::new("New GAME");
         let settings = Label::new("Settings");
         let exit = Label::new("Exit");
 
@@ -29,7 +38,6 @@ impl PlayState {
                 exit
             ],
             selected_index: 0,
-            should_terminate: false,
             bg_music_started: false
         };
 
@@ -43,43 +51,23 @@ impl PlayState {
             });
         }
 
+        this.buttons[this.selected_index as usize].set_selected(true);
+
         this
     }
 
-    fn update(&mut self, game_state: &mut GlobalState) {
-        const BUTTON_EXIT_SOUND: &'static str = "assets/sound/button2.wav";
-        const BUTTON_SOUND: &'static str = "assets/sound/button.wav";
-
-        self.should_terminate = false;
-
-        self.buttons[self.selected_index as usize].set_selected(false);
-
-        match game_state.input.get_pressed_key() {
-            Some(Key::Down) => {
-                self.selected_index = self.selected_index + 1;
-                game_state.sound.play(BUTTON_SOUND);
+    fn on_button_pressed(&mut self, button: u8, game_state: &mut GlobalState) -> PlayResult {
+        return match button {
+            BUTTON_EXIT => {
+                game_state.sound.play(BUTTON_SOUND_EXIT).unwrap();
+                std::thread::sleep(Duration::from_millis(800));
+                return PlayResult::Switch(Box::new(exit_splash::PlayState{}));
+            },
+            BUTTON_NEW_GAME => {
+                return PlayResult::Push(Box::new(map::PlayState::new()))
             }
-            Some(Key::Up) => {
-                self.selected_index = self.selected_index - 1;
-                game_state.sound.play(BUTTON_SOUND);
-            }
-            Some(Key::Esc) => {
-                self.should_terminate = true;
-            }
-            Some(Key::Char(char)) => {
-                // Enter on exit label
-                if (char as u8) == 10 && self.selected_index == 2 {
-                    self.should_terminate = true;
-                    game_state.sound.play(BUTTON_EXIT_SOUND);
-                    std::thread::sleep(Duration::from_millis(800));
-                }
-            }
-            _ => {}
-        }
-
-        self.adjust_selected_index();
-
-        self.buttons[self.selected_index as usize].set_selected(true);
+            _ => PlayResult::Still
+        };
     }
 
     fn adjust_selected_index(&mut self) {
@@ -104,19 +92,14 @@ impl super::PlayState for PlayState {
 
     fn play(&mut self, game_state: &mut GlobalState) -> PlayResult {
         if !self.bg_music_started {
-            game_state.sound.play(BG_MUSIC);
+            game_state.sound.play(BG_MUSIC).unwrap();
             self.bg_music_started = true;
         }
 
         game_state.render.clear_color = Box::new(color::Rgb(255, 255, 255));
         game_state.render.clear_screen();
 
-        self.update(game_state);
         self.render(game_state);
-
-        if self.should_terminate {
-            return PlayResult::Switch(Box::new(super::exit_splash::PlayState{}));
-        }
 
         PlayResult::Still
     }
@@ -125,7 +108,33 @@ impl super::PlayState for PlayState {
         String::from("MenuState")
     }
 
-    fn is_waiting_for_input(&self) -> bool {
-        true
+    fn on_key_pressed(&mut self, game_state: &mut GlobalState, key: Key) -> PlayResult {
+        self.buttons[self.selected_index as usize].set_selected(false);
+
+        match key {
+            Key::Down => {
+                self.selected_index = self.selected_index + 1;
+                game_state.sound.play(BUTTON_SOUND).unwrap();
+            }
+            Key::Up => {
+                self.selected_index = self.selected_index - 1;
+                game_state.sound.play(BUTTON_SOUND).unwrap();
+            }
+            Key::Esc => {
+                return PlayResult::Push(Box::new(map::PlayState::new()));
+            }
+            Key::Char(char) => {
+                // Enter on exit label
+                if (char as u8) == 10 {
+                    return self.on_button_pressed(self.selected_index as u8, game_state);
+                }
+            }
+            _ => {}
+        }
+
+        self.adjust_selected_index();
+
+        self.buttons[self.selected_index as usize].set_selected(true);
+        PlayResult::Still
     }
 }

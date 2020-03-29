@@ -53,14 +53,10 @@ impl super::PlayState for PlayState {
             std::thread::sleep(Duration::from_millis(20));
         }
 
-        PlayResult::Shutdown
+        PlayResult::Pop
     }
 
     fn to_string(&self) -> String {
         String::from("ExitSplash")
-    }
-
-    fn is_waiting_for_input(&self) -> bool {
-        false
     }
 }

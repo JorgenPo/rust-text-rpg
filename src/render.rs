@@ -36,6 +36,8 @@ impl Default for TermSize {
 pub enum Coordinate {
     Absolute(u16),
     Centered,
+    Percent(u8),
+    FromBorder(u16), // Pixels from border
 }
 
 pub struct Position {
@@ -124,18 +126,28 @@ impl Render {
         let x = match position.x {
             Coordinate::Absolute(x) => max(x, 1),
             Coordinate::Centered => self.get_middle_x(drawable),
+            Coordinate::Percent(percent) => max(self.term_size.width,
+                                                self.term_size.width * percent as u16 / 100),
+            Coordinate::FromBorder(x) => max(1, self.term_size.width - x)
         };
 
         let y = match position.y {
             Coordinate::Absolute(y) => max(y, 1),
             Coordinate::Centered => self.get_middle_y(drawable),
+            Coordinate::Percent(percent) => max(self.term_size.height,
+                                                self.term_size.height * percent as u16 / 100),
+            Coordinate::FromBorder(y) => max(1, self.term_size.height - y)
         };
 
         render!("{}{}", cursor::Goto(x, y), drawable.draw());
     }
 
+    pub fn draw_raw(&mut self, string: &str) {
+        render!("{}", string);
+    }
+
     pub fn flash(&self) {
-        std::io::stdout().flush();
+        std::io::stdout().flush().unwrap();
     }
 }
 

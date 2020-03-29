@@ -1,33 +1,24 @@
-use termion::input::TermRead;
+use termion::input::{TermRead, Keys};
 use termion::event::{Event, Key};
 use std::collections::HashMap;
+use termion::AsyncReader;
+use std::rc::Rc;
 
 pub struct Controller {
-    pressed_key: Option<Key>
+    reader: Keys<AsyncReader>
 }
 
 impl Controller {
     pub fn new() -> Self {
         Controller{
-            pressed_key: None
+            reader: termion::async_stdin().keys(),
         }
     }
 
-    /// Update input info (from polling stdin)
-    pub fn update(&mut self) {
-        self.pressed_key = None;
-
-        let stdin = std::io::stdin();
-
-        for raw_key in stdin.keys() {
-            let key = raw_key.expect("Failed to get key");
-
-            self.pressed_key = Some(key);
-            break;
-        }
-    }
-
-    pub fn get_pressed_key(&self) -> Option<Key> {
-        self.pressed_key
+    pub fn get_pressed_key(&mut self) -> Option<Key> {
+        return match self.reader.next() {
+            Some(key) => Some(key.unwrap()),
+            None => None,
+        };
     }
 }

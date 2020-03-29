@@ -26,7 +26,7 @@ impl PlayState {
     }
 }
 
-const SPLASH_DURATION: Duration = Duration::from_secs(5);
+const SPLASH_DURATION: Duration = Duration::from_secs(1);
 
 impl super::PlayState for PlayState {
 
@@ -82,9 +82,5 @@ impl super::PlayState for PlayState {
 
     fn to_string(&self) -> String {
         String::from("StartSplash")
-    }
-
-    fn is_waiting_for_input(&self) -> bool {
-        false
     }
 }

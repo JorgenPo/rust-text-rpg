@@ -1,6 +1,6 @@
 # Game backlog
 
-### Implement game state with translation between states (like in Veloren project)
+### Implement GAME state with translation between states (like in Veloren project)
  - Character creation screen
  - Main Game screen
  - Stats screen
